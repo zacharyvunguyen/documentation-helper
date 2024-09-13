@@ -126,7 +126,7 @@ def ingest_documents_into_pinecone(documents, embeddings):
 def ingest_docs():
     try:
         # Initialize Pinecone
-        pc=initialize_pinecone()
+        pc = initialize_pinecone()
 
         # Check or create Pinecone index
         index = check_or_create_index(pc)
