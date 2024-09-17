@@ -67,6 +67,14 @@ def run_llm(query: str):
         docsearch = PineconeVectorStore(index_name=PINECONE_INDEX_NAME, embedding=embeddings)
         logging.info(f"Connected to Pinecone index '{PINECONE_INDEX_NAME}'.")
 
+        # Retrieve documents from Pinecone
+        retriever = docsearch.as_retriever()
+        documents = retriever.get_relevant_documents(query)
+
+        # Log the content and metadata of the retrieved documents
+        for i, doc in enumerate(documents):
+            logging.info(f"Document {i+1}: Content: {doc.page_content[:200]}... Metadata: {doc.metadata}")  # Log first 200 characters of content and metadata
+
         # Initialize the chat model
         CHAT_MODEL = "gpt-4o-mini"
         chat = create_openai_chat(model=CHAT_MODEL, api_key=OPENAI_API_KEY)
@@ -79,7 +87,7 @@ def run_llm(query: str):
         prompt = ChatPromptTemplate.from_template(template)
 
         chain = (
-            {"context": docsearch.as_retriever(), "question": RunnablePassthrough()}
+            {"context": retriever, "question": RunnablePassthrough()}
             | prompt
             | chat
             | StrOutputParser()
