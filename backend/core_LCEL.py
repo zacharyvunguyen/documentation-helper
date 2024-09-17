@@ -81,8 +81,6 @@ def run_llm(query: str):
         logging.info(f"Invoking the chain with query: {query}")
         result = chain.invoke(input=query)
 
-        logging.info(f"LLM execution completed successfully with result: {result}")
-
         return result
 
     except Exception as e:
@@ -92,7 +90,7 @@ def run_llm(query: str):
 if __name__ == "__main__":
     try:
         logging.info("Running the main function...")
-        res = run_llm(query="what is LangChain Expression Language?")
+        res = run_llm(query="what is langchain?")
         print(res)
     except Exception as e:
         logging.error(f"Error in main execution: {e}")
