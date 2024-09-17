@@ -1,15 +1,14 @@
 import os
 import logging
 from dotenv import load_dotenv
-from langchain_community.chat_models import ChatOpenAI
-from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain_pinecone import PineconeVectorStore
 from langchain_core.pydantic_v1 import BaseModel
 from pinecone import Pinecone
-from core_functions import initialize_pinecone, create_openai_embeddings,create_openai_chat
+#from core_functions import initialize_pinecone, create_openai_embeddings,create_openai_chat
 
 # Load environment variables from .env file
 load_dotenv()
@@ -26,6 +25,39 @@ EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-3-small")
 
 logging.info(f"Environment variables loaded: OpenAI Model={EMBED_MODEL}, Pinecone Index={PINECONE_INDEX_NAME}")
 
+def initialize_pinecone(PINECONE_API_KEY):
+    try:
+        logging.info("Initializing Pinecone...")
+        pc = Pinecone(PINECONE_API_KEY=PINECONE_API_KEY)
+        logging.info("Pinecone initialized successfully.")
+        return pc
+    except Exception as e:
+        logging.error(f"Failed to initialize Pinecone: {e}")
+        raise
+
+def create_openai_embeddings(model, api_key):
+    try:
+        logging.info(f"Creating OpenAI embeddings with model '{model}'...")
+        if not api_key or not api_key.startswith("sk-"):
+            raise ValueError("Invalid or missing OpenAI API key.")
+        embeddings = OpenAIEmbeddings(model=model, openai_api_key=api_key)
+        logging.info(f"OpenAI Embeddings initialized successfully with model '{model}'.")
+        return embeddings
+    except Exception as e:
+        logging.error(f"Failed to initialize OpenAI Embeddings: {e}")
+        raise
+
+def create_openai_chat(model, api_key):
+    try:
+        logging.info(f"Creating ChatOpenAI with model '{model}'...")
+        if not api_key or not api_key.startswith("sk-"):
+            raise ValueError("Invalid or missing OpenAI API key.")
+        chat = ChatOpenAI(model=model, openai_api_key=api_key)
+        logging.info(f"ChatOpenAI initialized successfully with model '{model}'.")
+        return chat
+    except Exception as e:
+        logging.error(f"Failed to initialize ChatOpenAI: {e}")
+        raise
 
 # Function to format retrieved documents into a single string
 def format_docs(docs):
@@ -55,9 +87,13 @@ def run_llm(query: str):
         retriever = docsearch.as_retriever()
         documents = retriever.get_relevant_documents(query)
 
+        # Initialize a list to store metadata
+        metadata_list = []
+
         # Log the content and metadata of the retrieved documents
         for i, doc in enumerate(documents):
             logging.info(f"Document {i+1}: Content: {doc.page_content[:200]}... Metadata: {doc.metadata}")  # Log first 200 characters of content and metadata
+            metadata_list.append(doc.metadata)
 
         # Initialize the chat model
         CHAT_MODEL = "gpt-4o-mini"
@@ -81,7 +117,8 @@ def run_llm(query: str):
         logging.info(f"Invoking the chain with query: {query}")
         result = chain.invoke(input=query)
 
-        return result
+        # Return both the result and the metadata list
+        return result, metadata_list
 
     except Exception as e:
         logging.error(f"Error during LLM execution: {e}")
@@ -90,7 +127,9 @@ def run_llm(query: str):
 if __name__ == "__main__":
     try:
         logging.info("Running the main function...")
-        res = run_llm(query="what is langchain?")
-        print(res)
+        # Capture both the result and metadata_list
+        res, metadata_list = run_llm(query="what is langchain?")
+        print("Answer:", res)
+        print("Metadata List:", metadata_list)
     except Exception as e:
         logging.error(f"Error in main execution: {e}")
