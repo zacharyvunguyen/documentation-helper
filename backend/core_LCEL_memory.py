@@ -85,7 +85,7 @@ def run_llm(query: str, conversation_history: list):
         logging.info(f"Connected to Pinecone index '{PINECONE_INDEX_NAME}'.")
 
         # Retrieve documents from Pinecone
-        retriever = docsearch.as_retriever()
+        retriever = docsearch.as_retriever(search_kwargs={"k": 20})
         documents = retriever.get_relevant_documents(query)
 
         # Initialize a list to store metadata
@@ -97,7 +97,7 @@ def run_llm(query: str, conversation_history: list):
             metadata_list.append(doc.metadata)
 
         # Initialize the chat model
-        CHAT_MODEL = "gpt-4o-mini"  # Use "gpt-4" if you have access
+        CHAT_MODEL = "gpt-4o-mini"
         chat = create_openai_chat(model=CHAT_MODEL, api_key=OPENAI_API_KEY)
 
         # Build the conversation history into the prompt
