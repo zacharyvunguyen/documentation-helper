@@ -7,7 +7,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_pinecone import PineconeVectorStore
 from langchain_core.pydantic_v1 import BaseModel
-from pinecone import Pinecone
+from pinecone import Pinecone  # Removed ApiException
 
 # Load environment variables from .env file
 load_dotenv()
@@ -30,7 +30,7 @@ def initialize_pinecone(PINECONE_API_KEY):
         pc = Pinecone(PINECONE_API_KEY=PINECONE_API_KEY)
         logging.info("Pinecone initialized successfully.")
         return pc
-    except Exception as e:
+    except Exception as e:  # Removed ApiException and replaced with generic Exception
         logging.error(f"Failed to initialize Pinecone: {e}")
         raise
 
@@ -45,6 +45,7 @@ def create_openai_embeddings(model, api_key):
     except Exception as e:
         logging.error(f"Failed to initialize OpenAI Embeddings: {e}")
         raise
+
 def create_openai_chat(model, api_key):
     try:
         logging.info(f"Creating ChatOpenAI with model '{model}'...")
@@ -64,6 +65,25 @@ def format_docs(docs):
 # Add typing for input using BaseModel
 class Question(BaseModel):
     __root__: str
+
+# Function to perform reranking using Pinecone Inference API
+def rerank_documents(pc, query, documents):
+    try:
+        logging.info("Performing reranking with Pinecone Inference API...")
+        # Perform reranking using the provided Pinecone Inference API
+        rerank_results = pc.inference.rerank(
+            model="bge-reranker-v2-m3",  # Use the desired model for reranking
+            query=query,
+            documents=[doc.page_content for doc in documents],
+            top_n=3,  # Number of top documents to keep after reranking
+            return_documents=True
+        )
+        reranked_docs = [documents[i] for i in rerank_results["ranking"]]
+        logging.info("Reranking completed successfully.")
+        return reranked_docs
+    except Exception as e:
+        logging.error(f"Failed to rerank documents: {e}")
+        return documents  # Return original order if reranking fails
 
 # Run LLM function
 def run_llm(query: str, conversation_history: list):
@@ -89,6 +109,9 @@ def run_llm(query: str, conversation_history: list):
         metadata_list = [
             {"page_content": doc.page_content, **doc.metadata} for doc in documents
         ]
+
+        # Perform reranking on the retrieved documents
+        documents = rerank_documents(pc, query, documents)
 
         # Initialize the chat model with a larger context window
         CHAT_MODEL = "gpt-3.5-turbo-16k"  # Use "gpt-4" if you have access

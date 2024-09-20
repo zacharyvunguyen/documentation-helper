@@ -1,12 +1,12 @@
 import streamlit as st
 import logging
-from backend.core_LCEL_memory import run_llm
+from backend.core_LCEL_memory import run_llm  # Make sure this path is correct based on your project structure
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Set the title of the Streamlit app
-st.title("🧠 LANGCHAIN Chatbot with Memory and Metadata")
+st.title("🧠 LANGCHAIN Chatbot with Memory and Reranking")
 
 # Add a button to reset the conversation
 if st.button("Reset Conversation"):
