@@ -84,8 +84,8 @@ def run_llm(query: str, conversation_history: list):
         docsearch = PineconeVectorStore(index_name=PINECONE_INDEX_NAME, embedding=embeddings)
         logging.info(f"Connected to Pinecone index '{PINECONE_INDEX_NAME}'.")
 
-        # Retrieve documents from Pinecone
-        retriever = docsearch.as_retriever(search_kwargs={"k": 20})
+        # Retrieve documents from Pinecone, set 'k' to retrieve more documents
+        retriever = docsearch.as_retriever(search_kwargs={"k": 10})  # Adjust 'k' as needed
         documents = retriever.get_relevant_documents(query)
 
         # Initialize a list to store metadata
@@ -96,14 +96,17 @@ def run_llm(query: str, conversation_history: list):
             logging.info(f"Document {i+1}: Content: {doc.page_content[:200]}... Metadata: {doc.metadata}")
             metadata_list.append(doc.metadata)
 
-        # Initialize the chat model
-        CHAT_MODEL = "gpt-4o-mini"
+        # Initialize the chat model with a larger context window
+        CHAT_MODEL = "gpt-3.5-turbo-16k"  # Use "gpt-4" if you have access
         chat = create_openai_chat(model=CHAT_MODEL, api_key=OPENAI_API_KEY)
 
         # Build the conversation history into the prompt
         conversation_str = ""
         for turn in conversation_history:
             conversation_str += f"User: {turn['user']}\nAssistant: {turn['bot']}\n"
+
+        # Optionally, truncate or summarize conversation history
+        # conversation_str = truncate_conversation(conversation_str, max_tokens=...)
 
         # Format documents into context string
         context_str = format_docs(documents)
