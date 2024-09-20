@@ -1,10 +1,3 @@
-"""
-Streamlit app for a LANGCHAIN Chatbot with Memory and Metadata.
-
-This app allows users to interact with a chatbot that uses LangChain and maintains conversation memory,
-along with displaying metadata from retrieved documents.
-"""
-
 import streamlit as st
 import logging
 from backend.core_LCEL_memory import run_llm
@@ -18,6 +11,7 @@ st.title("🧠 LANGCHAIN Chatbot with Memory and Metadata")
 # Add a button to reset the conversation
 if st.button("Reset Conversation"):
     st.session_state.conversation = []
+    st.experimental_rerun()
 
 # Initialize session state variables for conversation history
 if 'conversation' not in st.session_state:
@@ -32,7 +26,7 @@ if st.session_state.conversation:
         # Display bot response
         with st.chat_message("assistant"):
             st.write(chat['bot'])
-            # Display metadata in an expandable section within the assistant's message
+            # Always display metadata in an expandable section within the assistant's message
             if chat['metadata']:
                 with st.expander("Show Retrieved Documents Metadata"):
                     for idx, metadata in enumerate(chat['metadata'], 1):
@@ -50,13 +44,13 @@ if user_input is not None:
         with st.spinner("Thinking..."):
             try:
                 # Call run_llm with the user input and conversation history
-                answer, metadata_list = run_llm(user_input, st.session_state.conversation)
+                answer, show_metadata, metadata_list = run_llm(user_input, st.session_state.conversation)
 
-                # Append the new interaction to the conversation history, including metadata
+                # Append the new interaction to the conversation history
                 st.session_state.conversation.append({
                     "user": user_input,
                     "bot": answer,
-                    "metadata": metadata_list or []
+                    "metadata": metadata_list  # Always include metadata list
                 })
 
                 # Display the new user message
@@ -66,6 +60,7 @@ if user_input is not None:
                 # Display the bot's response
                 with st.chat_message("assistant"):
                     st.write(answer)
+                    # Always display the metadata expander
                     if metadata_list:
                         with st.expander("Show Retrieved Documents Metadata"):
                             for idx, metadata in enumerate(metadata_list, 1):

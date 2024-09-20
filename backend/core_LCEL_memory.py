@@ -1,15 +1,13 @@
 import os
 import logging
+import json
 from dotenv import load_dotenv
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain_pinecone import PineconeVectorStore
 from langchain_core.pydantic_v1 import BaseModel
 from pinecone import Pinecone
-
-# from core_functions import initialize_pinecone, create_openai_embeddings,create_openai_chat
 
 # Load environment variables from .env file
 load_dotenv()
@@ -26,7 +24,6 @@ EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-3-small")
 
 logging.info(f"Environment variables loaded: OpenAI Model={EMBED_MODEL}, Pinecone Index={PINECONE_INDEX_NAME}")
 
-
 def initialize_pinecone(PINECONE_API_KEY):
     try:
         logging.info("Initializing Pinecone...")
@@ -36,6 +33,7 @@ def initialize_pinecone(PINECONE_API_KEY):
     except Exception as e:
         logging.error(f"Failed to initialize Pinecone: {e}")
         raise
+
 def create_openai_embeddings(model, api_key):
     try:
         logging.info(f"Creating OpenAI embeddings with model '{model}'...")
@@ -67,7 +65,6 @@ def format_docs(docs):
 class Question(BaseModel):
     __root__: str
 
-
 # Run LLM function
 def run_llm(query: str, conversation_history: list):
     try:
@@ -88,25 +85,19 @@ def run_llm(query: str, conversation_history: list):
         retriever = docsearch.as_retriever(search_kwargs={"k": 10})  # Adjust 'k' as needed
         documents = retriever.get_relevant_documents(query)
 
-        # Initialize a list to store metadata
-        metadata_list = []
-
-        # Log the content and metadata of the retrieved documents
-        for i, doc in enumerate(documents):
-            logging.info(f"Document {i+1}: Content: {doc.page_content[:200]}... Metadata: {doc.metadata}")
-            metadata_list.append(doc.metadata)
+        # Include both metadata and page content in the metadata list
+        metadata_list = [
+            {"page_content": doc.page_content, **doc.metadata} for doc in documents
+        ]
 
         # Initialize the chat model with a larger context window
         CHAT_MODEL = "gpt-3.5-turbo-16k"  # Use "gpt-4" if you have access
         chat = create_openai_chat(model=CHAT_MODEL, api_key=OPENAI_API_KEY)
 
         # Build the conversation history into the prompt
-        conversation_str = ""
-        for turn in conversation_history:
-            conversation_str += f"User: {turn['user']}\nAssistant: {turn['bot']}\n"
-
-        # Optionally, truncate or summarize conversation history
-        # conversation_str = truncate_conversation(conversation_str, max_tokens=...)
+        conversation_str = "\n".join(
+            f"User: {turn['user']}\nAssistant: {turn['bot']}" for turn in conversation_history
+        )
 
         # Format documents into context string
         context_str = format_docs(documents)
@@ -115,10 +106,23 @@ def run_llm(query: str, conversation_history: list):
         template = """You are a helpful assistant.
 Here is the conversation so far:
 {conversation}
-Answer the question based only on the following context:
+Here is some context that may help answer the question:
 {context}
+
+Please answer the following question based only on the context provided. 
+If the context does not contain enough information to answer the question, please indicate that you cannot answer based on the provided information.
+
+Return your response in the following JSON format:
+
+{{
+    "answer": "Your answer here",
+    "show_metadata": true
+}}
+
+Ensure that the JSON is valid and properly formatted.
 Question: {question}
 """
+
         prompt = ChatPromptTemplate.from_template(template)
 
         # Prepare the inputs for the chain
@@ -135,8 +139,20 @@ Question: {question}
         logging.info(f"Invoking the chain with query: {query}")
         result = chain.invoke(inputs)
 
-        # Return both the result and the metadata list
-        return result, metadata_list
+        logging.debug(f"Raw LLM response: {result}")
+
+        # Parse the JSON response
+        try:
+            parsed_result = json.loads(result)
+            answer = parsed_result.get("answer", "I'm sorry, I couldn't find an answer to that.")
+            show_metadata = parsed_result.get("show_metadata", False)
+
+            return answer, show_metadata, metadata_list
+
+        except json.JSONDecodeError as e:
+            logging.error(f"Failed to parse LLM response as JSON: {e}")
+            # Fallback: return the raw response and metadata
+            return result, False, metadata_list
 
     except Exception as e:
         logging.error(f"Error during LLM execution: {e}")
@@ -146,8 +162,10 @@ Question: {question}
 if __name__ == "__main__":
     try:
         logging.info("Running the main function...")
+        # Example conversation history; adjust as needed
+        conversation_history = []
         # Capture both the result and metadata_list
-        res, metadata_list = run_llm(query="what is langchain?")
+        res, metadata_list = run_llm(query="what is langchain?", conversation_history=conversation_history)
         print("Answer:", res)
         print("Metadata List:", metadata_list)
     except Exception as e:
