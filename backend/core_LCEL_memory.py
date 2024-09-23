@@ -86,7 +86,7 @@ def rerank_documents(pc, query, documents):
         return documents  # Return original order if reranking fails
 
 # Run LLM function
-def run_llm(query: str, conversation_history: list):
+def run_llm(query: str, conversation_history: list, model: str, temperature: float, max_tokens: int):
     try:
         logging.info(f"Starting LLM execution with query: {query}")
 
@@ -113,9 +113,8 @@ def run_llm(query: str, conversation_history: list):
         # Perform reranking on the retrieved documents
         documents = rerank_documents(pc, query, documents)
 
-        # Initialize the chat model with a larger context window
-        CHAT_MODEL = "gpt-3.5-turbo-16k"  # Use "gpt-4" if you have access
-        chat = create_openai_chat(model=CHAT_MODEL, api_key=OPENAI_API_KEY)
+        # Initialize the chat model with the selected context window
+        chat = create_openai_chat(model=model, api_key=OPENAI_API_KEY)
 
         # Build the conversation history into the prompt
         conversation_str = "\n".join(
