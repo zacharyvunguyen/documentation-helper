@@ -58,8 +58,8 @@ Follow these steps to set up and run the Advanced Conversational AI Chatbot on y
 ### 1. **Clone the Repository**
 
 ```bash
-git clone https://github.com/yourusername/advanced-conversational-ai-chatbot.git
-cd advanced-conversational-ai-chatbot
+git clone https://github.com/zacharyvunguyen/documentation-helper.git
+cd documentation-helper
 ```
 
 ### 2. **Create a Virtual Environment**
@@ -123,7 +123,7 @@ PINECONE_ENVIRONMENT=your_pinecone_environment  # e.g., "us-east1-gcp"
 
 ### 1. **Pinecone Index Setup**
 
-The ingestion script (`ingestion.py`) is responsible for setting up the Pinecone index. By default, it checks if the specified index exists and creates it if it doesn't. Ensure that your Pinecone account has the necessary permissions and that the index configuration matches your embedding dimensions and metrics.
+The ingestion script (`zach_ingestion.py`) is responsible for setting up the Pinecone index. By default, it checks if the specified index exists and creates it if it doesn't. Ensure that your Pinecone account has the necessary permissions and that the index configuration matches your embedding dimensions and metrics.
 
 ### 2. **OpenAI API Configuration**
 
@@ -147,7 +147,7 @@ advanced-conversational-ai-chatbot/
 ├── backend/
 │   ├── core_LCEL_memory.py
 │   └── __init__.py
-├── ingestion.py
+├── zach_ingestion.py
 ├── main.py
 ├── .env
 ├── .gitignore
@@ -155,7 +155,7 @@ advanced-conversational-ai-chatbot/
 └── requirements.txt
 ```
 
-- **ingestion.py:** Handles document loading, preprocessing, embedding creation, and ingestion into Pinecone.
+- **zach_ingestion.py:** Handles document loading, preprocessing, embedding creation, and ingestion into Pinecone.
 - **backend/core_LCEL_memory.py:** Contains the core logic for interacting with the LLM, including reranking and response generation.
 - **main.py:** Streamlit application serving as the frontend interface for user interactions.
 - **.env:** Stores environment variables and API keys.
@@ -170,7 +170,7 @@ advanced-conversational-ai-chatbot/
 Before running the chatbot, you need to ingest documents into the Pinecone index.
 
 ```bash
-python ingestion.py
+python zach_ingestion.py
 ```
 
 **What This Does:**
@@ -262,7 +262,7 @@ Navigate to the original repository and create a pull request from your fork's b
 
 **Zachary Nguyen**
 
-- **Email:** [zachary.nguyen@example.com](mailto:zachary.nguyen@example.com)
+- **Email:** [zacharynguyen.ds@gmail.com](mailto:[zacharynguyen.ds@gmail.com)
 - **LinkedIn:** [linkedin.com/in/zacharynguyen](https://linkedin.com/in/zacharynguyen)
 - **GitHub:** [github.com/zacharynguyen](https://github.com/zacharynguyen)
 
@@ -275,18 +275,12 @@ Feel free to reach out for any queries, suggestions, or collaborations!
 *Include screenshots of your application to give users a visual understanding.*
 
 ### **Chat Interface**
-
-![Chat Interface](screenshots/chat_interface.png)
-
-### **Settings Sidebar**
-
-![Settings Sidebar](screenshots/settings_sidebar.png)
+![chatbot.gif](screenshots%2Fchatbot.gif)
 
 ### **Metadata Display**
 
-![Metadata Display](screenshots/metadata_display.png)
+![metadata.png](screenshots%2Fmetadata.png)
 
-*Ensure that the `screenshots` directory contains the respective images.*
 
 ---
 
