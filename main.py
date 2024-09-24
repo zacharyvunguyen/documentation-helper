@@ -1,11 +1,21 @@
+# main.py
+
 import streamlit as st
 import logging
-from backend.core_LCEL_memory import run_llm
 import os
 import json
+from backend.core_LCEL_memory import run_llm
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Initialize session state variables for conversation history
+if 'conversation' not in st.session_state:
+    st.session_state.conversation = []
 
 # Set page configuration
 st.set_page_config(
@@ -62,22 +72,22 @@ with st.sidebar:
 
     # Datasource Information
     with st.expander("Datasource Information"):
-        st.markdown("""
+        st.markdown(f"""
         **Vector Database:** Pinecone  
         **Embedding Model:** OpenAI Embeddings  
         **Reranker Model:** bge-reranker-v2-m3  
-        **LLM Model:** {model}
-        """.format(model=llm_model))
+        **LLM Model:** {llm_model}
+        """)
         st.markdown("""
         **API Keys:**  
         - OpenAI: Configured securely on the backend.  
         - Pinecone: Configured securely on the backend.
         """)
-        st.markdown("""
+        st.markdown(f"""
         **Environment:**  
-        - **Pinecone Environment:** `{env}`  
-        - **Index Name:** `{index}`
-        """.format(env=os.getenv("PINECONE_ENVIRONMENT"), index=os.getenv("PINECONE_INDEX_NAME")))
+        - **Pinecone Environment:** `{os.getenv("PINECONE_ENVIRONMENT")}`  
+        - **Index Name:** `{os.getenv("PINECONE_INDEX_NAME")}`
+        """)
 
     # Help Section
     st.markdown("""
@@ -100,17 +110,14 @@ Feel free to ask any questions or have a conversation. Your conversation history
 """)
 
 # Export Conversation Button
-if st.session_state.get('conversation'):
+if st.session_state.conversation:
+    conversation_json = json.dumps(st.session_state.conversation, indent=2)
     st.download_button(
         label="📥 Download Conversation",
-        data=json.dumps(st.session_state.conversation, indent=2),
+        data=conversation_json,
         file_name='conversation_history.json',
         mime='application/json'
     )
-
-# Initialize session state variables for conversation history
-if 'conversation' not in st.session_state:
-    st.session_state.conversation = []
 
 # Display the conversation history using Streamlit's chat elements
 if st.session_state.conversation:

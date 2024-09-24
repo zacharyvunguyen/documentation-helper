@@ -1,3 +1,5 @@
+# backend/core_LCEL_memory.py
+
 import os
 import logging
 import json
@@ -7,7 +9,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_pinecone import PineconeVectorStore
 from langchain_core.pydantic_v1 import BaseModel
-from pinecone import Pinecone  # Removed ApiException
+from pinecone import Pinecone  # Ensure correct Pinecone client is used
 
 # Load environment variables from .env file
 load_dotenv()
@@ -24,13 +26,13 @@ EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-3-small")
 
 logging.info(f"Environment variables loaded: OpenAI Model={EMBED_MODEL}, Pinecone Index={PINECONE_INDEX_NAME}")
 
-def initialize_pinecone(PINECONE_API_KEY):
+def initialize_pinecone(api_key):
     try:
         logging.info("Initializing Pinecone...")
-        pc = Pinecone(PINECONE_API_KEY=PINECONE_API_KEY)
+        pinecone_client = Pinecone(api_key=api_key, environment=PINECONE_ENVIRONMENT)
         logging.info("Pinecone initialized successfully.")
-        return pc
-    except Exception as e:  # Removed ApiException and replaced with generic Exception
+        return pinecone_client
+    except Exception as e:
         logging.error(f"Failed to initialize Pinecone: {e}")
         raise
 
@@ -58,24 +60,20 @@ def create_openai_chat(model, api_key):
         logging.error(f"Failed to initialize ChatOpenAI: {e}")
         raise
 
-# Function to format retrieved documents into a single string
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
-# Add typing for input using BaseModel
 class Question(BaseModel):
     __root__: str
 
-# Function to perform reranking using Pinecone Inference API
-def rerank_documents(pc, query, documents):
+def rerank_documents(pinecone_client, query, documents):
     try:
         logging.info("Performing reranking with Pinecone Inference API...")
-        # Perform reranking using the provided Pinecone Inference API
-        rerank_results = pc.inference.rerank(
-            model="bge-reranker-v2-m3",  # Use the desired model for reranking
+        rerank_results = pinecone_client.inference.rerank(
+            model="bge-reranker-v2-m3",
             query=query,
             documents=[doc.page_content for doc in documents],
-            top_n=3,  # Number of top documents to keep after reranking
+            top_n=3,
             return_documents=True
         )
         reranked_docs = [documents[i] for i in rerank_results["ranking"]]
@@ -85,13 +83,12 @@ def rerank_documents(pc, query, documents):
         logging.error(f"Failed to rerank documents: {e}")
         return documents  # Return original order if reranking fails
 
-# Run LLM function
 def run_llm(query: str, conversation_history: list, model: str, temperature: float, max_tokens: int):
     try:
         logging.info(f"Starting LLM execution with query: {query}")
 
         # Initialize Pinecone client
-        pc = initialize_pinecone(PINECONE_API_KEY)
+        pinecone_client = initialize_pinecone(PINECONE_API_KEY)
 
         # Create embeddings using OpenAI with the API key
         embeddings = create_openai_embeddings(EMBED_MODEL, OPENAI_API_KEY)
@@ -101,7 +98,7 @@ def run_llm(query: str, conversation_history: list, model: str, temperature: flo
         docsearch = PineconeVectorStore(index_name=PINECONE_INDEX_NAME, embedding=embeddings)
         logging.info(f"Connected to Pinecone index '{PINECONE_INDEX_NAME}'.")
 
-        # Retrieve documents from Pinecone, set 'k' to retrieve more documents
+        # Retrieve documents from Pinecone
         retriever = docsearch.as_retriever(search_kwargs={"k": 10})  # Adjust 'k' as needed
         documents = retriever.get_relevant_documents(query)
 
@@ -111,7 +108,7 @@ def run_llm(query: str, conversation_history: list, model: str, temperature: flo
         ]
 
         # Perform reranking on the retrieved documents
-        documents = rerank_documents(pc, query, documents)
+        documents = rerank_documents(pinecone_client, query, documents)
 
         # Initialize the chat model with the selected context window
         chat = create_openai_chat(model=model, api_key=OPENAI_API_KEY)
@@ -179,16 +176,3 @@ Question: {question}
     except Exception as e:
         logging.error(f"Error during LLM execution: {e}")
         raise
-
-
-if __name__ == "__main__":
-    try:
-        logging.info("Running the main function...")
-        # Example conversation history; adjust as needed
-        conversation_history = []
-        # Capture both the result and metadata_list
-        res, metadata_list = run_llm(query="what is langchain?", conversation_history=conversation_history)
-        print("Answer:", res)
-        print("Metadata List:", metadata_list)
-    except Exception as e:
-        logging.error(f"Error in main execution: {e}")
