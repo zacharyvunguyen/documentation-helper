@@ -1,15 +1,15 @@
-# backend/core_LCEL_memory.py
-
 import os
 import logging
-import json
 from dotenv import load_dotenv
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain_pinecone import PineconeVectorStore
 from langchain_core.pydantic_v1 import BaseModel
-from pinecone import Pinecone  # Ensure correct Pinecone client is used
+from pinecone import Pinecone
+
+# from core_functions import initialize_pinecone, create_openai_embeddings, create_openai_chat
 
 # Load environment variables from .env file
 load_dotenv()
@@ -21,20 +21,23 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT")
-PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
+# PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
+PINECONE_INDEX_NAME = "fin-docs-index"
 EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-3-small")
 
 logging.info(f"Environment variables loaded: OpenAI Model={EMBED_MODEL}, Pinecone Index={PINECONE_INDEX_NAME}")
 
-def initialize_pinecone(api_key):
+
+def initialize_pinecone(PINECONE_API_KEY):
     try:
         logging.info("Initializing Pinecone...")
-        pinecone_client = Pinecone(api_key=api_key, environment=PINECONE_ENVIRONMENT)
+        pc = Pinecone(PINECONE_API_KEY=PINECONE_API_KEY)
         logging.info("Pinecone initialized successfully.")
-        return pinecone_client
+        return pc
     except Exception as e:
         logging.error(f"Failed to initialize Pinecone: {e}")
         raise
+
 
 def create_openai_embeddings(model, api_key):
     try:
@@ -48,6 +51,7 @@ def create_openai_embeddings(model, api_key):
         logging.error(f"Failed to initialize OpenAI Embeddings: {e}")
         raise
 
+
 def create_openai_chat(model, api_key):
     try:
         logging.info(f"Creating ChatOpenAI with model '{model}'...")
@@ -60,35 +64,24 @@ def create_openai_chat(model, api_key):
         logging.error(f"Failed to initialize ChatOpenAI: {e}")
         raise
 
+
+# Function to format retrieved documents into a single string
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
+
+# Add typing for input using BaseModel
 class Question(BaseModel):
     __root__: str
 
-def rerank_documents(pinecone_client, query, documents):
-    try:
-        logging.info("Performing reranking with Pinecone Inference API...")
-        rerank_results = pinecone_client.inference.rerank(
-            model="bge-reranker-v2-m3",
-            query=query,
-            documents=[doc.page_content for doc in documents],
-            top_n=3,
-            return_documents=True
-        )
-        reranked_docs = [documents[i] for i in rerank_results["ranking"]]
-        logging.info("Reranking completed successfully.")
-        return reranked_docs
-    except Exception as e:
-        logging.error(f"Failed to rerank documents: {e}")
-        return documents  # Return original order if reranking fails
 
-def run_llm(query: str, conversation_history: list, model: str, temperature: float, max_tokens: int):
+# Run LLM function
+def run_llm(query: str, conversation_history: list):
     try:
         logging.info(f"Starting LLM execution with query: {query}")
 
         # Initialize Pinecone client
-        pinecone_client = initialize_pinecone(PINECONE_API_KEY)
+        pc = initialize_pinecone(PINECONE_API_KEY)
 
         # Create embeddings using OpenAI with the API key
         embeddings = create_openai_embeddings(EMBED_MODEL, OPENAI_API_KEY)
@@ -99,48 +92,52 @@ def run_llm(query: str, conversation_history: list, model: str, temperature: flo
         logging.info(f"Connected to Pinecone index '{PINECONE_INDEX_NAME}'.")
 
         # Retrieve documents from Pinecone
-        retriever = docsearch.as_retriever(search_kwargs={"k": 10})  # Adjust 'k' as needed
+        retriever = docsearch.as_retriever(search_kwargs={"k": 200})
         documents = retriever.get_relevant_documents(query)
 
-        # Include both metadata and page content in the metadata list
-        metadata_list = [
-            {"page_content": doc.page_content, **doc.metadata} for doc in documents
-        ]
+        # Initialize a list to store metadata
+        metadata_list = []
 
-        # Perform reranking on the retrieved documents
-        documents = rerank_documents(pinecone_client, query, documents)
+        # Log the content and metadata of the retrieved documents
+        for i, doc in enumerate(documents):
+            logging.info(f"Document {i+1}: Content: {doc.page_content[:200]}... Metadata: {doc.metadata}")
+            metadata_list.append(doc.metadata)
 
-        # Initialize the chat model with the selected context window
-        chat = create_openai_chat(model=model, api_key=OPENAI_API_KEY)
+        # Initialize the chat model
+        CHAT_MODEL = "gpt-4o-mini"
+        chat = create_openai_chat(model=CHAT_MODEL, api_key=OPENAI_API_KEY)
 
         # Build the conversation history into the prompt
-        conversation_str = "\n".join(
-            f"User: {turn['user']}\nAssistant: {turn['bot']}" for turn in conversation_history
-        )
+        conversation_str = ""
+        for turn in conversation_history:
+            conversation_str += f"User: {turn['user']}\nAssistant: {turn['bot']}\n"
 
         # Format documents into context string
         context_str = format_docs(documents)
 
-        # RAG prompt with conversation history
-        template = """You are a helpful assistant.
-Here is the conversation so far:
-{conversation}
-Here is some context that may help answer the question:
-{context}
+        # Your custom prompt integrated with placeholders
+        template = """
+        You are an experienced accountant and financial analyst specializing in analyzing large financial datasets.
 
-Please answer the following question based only on the context provided. 
-If the context does not contain enough information to answer the question, please indicate that you cannot answer based on the provided information.
+        When answering user questions, your task is to:
 
-Return your response in the following JSON format:
+        - Identify and summarize material changes in financial data between two versions of financial reports (e.g., BD3 and BD4 books for a given month).
+        - Focus on the areas specified by the user, such as Balance Sheet Changes, Profit & Loss (P&L) Changes, and Statistics Changes.
+        - Highlight significant changes based on thresholds provided in the user's question.
+        - Consider both positive and negative changes.
+        - Avoid comparing current data with prior months unless explicitly requested.
+        - Provide the results in a clear, structured summary with distinct sections as appropriate.
+        - **Present the findings in a table format for each section, including columns for 'Line Item/Statistic', 'Amount of Change', and 'Notes/Observations'.**
+        - **Include additional insights or interpretations that would be valuable for presenting to the director board.**
 
-{{
-    "answer": "Your answer here",
-    "show_metadata": true
-}}
+        Use the following context to help answer the question:
+        {context}
 
-Ensure that the JSON is valid and properly formatted.
-Question: {question}
-"""
+        Here is the conversation so far:
+        {conversation}
+
+        Question: {question}
+        """
 
         prompt = ChatPromptTemplate.from_template(template)
 
@@ -158,21 +155,24 @@ Question: {question}
         logging.info(f"Invoking the chain with query: {query}")
         result = chain.invoke(inputs)
 
-        logging.debug(f"Raw LLM response: {result}")
-
-        # Parse the JSON response
-        try:
-            parsed_result = json.loads(result)
-            answer = parsed_result.get("answer", "I'm sorry, I couldn't find an answer to that.")
-            show_metadata = parsed_result.get("show_metadata", False)
-
-            return answer, show_metadata, metadata_list
-
-        except json.JSONDecodeError as e:
-            logging.error(f"Failed to parse LLM response as JSON: {e}")
-            # Fallback: return the raw response and metadata
-            return result, False, metadata_list
+        # Return both the result and the metadata list
+        return result, metadata_list
 
     except Exception as e:
         logging.error(f"Error during LLM execution: {e}")
         raise
+
+
+if __name__ == "__main__":
+    try:
+        logging.info("Running the main function...")
+        # Sample conversation history
+        conversation_history = []
+        # Sample query
+        query = "Identify the material changes between the BD3 and BD4 books for August 2025."
+        # Capture both the result and metadata_list
+        res, metadata_list = run_llm(query=query, conversation_history=conversation_history)
+        print("Answer:", res)
+        print("Metadata List:", metadata_list)
+    except Exception as e:
+        logging.error(f"Error in main execution: {e}")
