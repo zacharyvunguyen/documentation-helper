@@ -2,7 +2,18 @@
 # 🤖 Advanced Conversational AI Chatbot
 
 Welcome to the **Advanced Conversational AI Chatbot** project! This chatbot leverages cutting-edge technologies such as Pinecone for vector indexing, LangChain for language model chaining, and OpenAI's GPT models for natural language understanding and generation. The application features a user-friendly interface built with Streamlit, enabling interactive conversations, dynamic settings adjustments, and seamless integration with various data sources.
+---
 
+## 📸 Screenshots
+
+*Include screenshots of your application to give users a visual understanding.*
+
+### **Chat Interface**
+![chatbot.gif](screenshots%2Fchatbot.gif)
+
+### **Metadata Display**
+
+![metadata.png](screenshots%2Fmetadata.png)
 ---
 
 ## Table of Contents
@@ -267,19 +278,6 @@ Navigate to the original repository and create a pull request from your fork's b
 - **GitHub:** [github.com/zacharynguyen](https://github.com/zacharynguyen)
 
 Feel free to reach out for any queries, suggestions, or collaborations!
-
----
-
-## 📸 Screenshots
-
-*Include screenshots of your application to give users a visual understanding.*
-
-### **Chat Interface**
-![chatbot.gif](screenshots%2Fchatbot.gif)
-
-### **Metadata Display**
-
-![metadata.png](screenshots%2Fmetadata.png)
 
 
 ---
